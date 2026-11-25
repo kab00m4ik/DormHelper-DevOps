@@ -143,49 +143,48 @@ flowchart TB
 ### 4.3. Модель 4+1: Фізичний вигляд / Вигляд розгортання (Deployment View)
 Показує, як програмні контейнери DormHelper мапляться на інфраструктуру та кластер Kubernetes з урахуванням масштабованості, безпеки та observability.
 
-```meramid
 flowchart TB
     subgraph Client_Node ["Клієнтське середовище"]
-        Browser["Браузер або мобільний пристрій користувача"]
+        Browser["Браузер або мобільний пристрій"]
     end
 
-    subgraph Cloud_Infra ["Хмарна / Серверна інфраструктура"]
-        LB["<b>Reverse Proxy / Ingress Controller</b><br/>[TLS Termination, Rate Limiting]"]
+    subgraph Cloud_Infra ["Хмарна інфраструктура"]
+        LB["Reverse Proxy / Ingress - TLS, Rate Limiting"]
 
-        subgraph K8s_Cluster ["Kubernetes Cluster (Production)"]
+        subgraph K8s_Cluster ["Kubernetes Cluster - Production"]
             subgraph App_Namespace ["Namespace: dormhelper-prod"]
-                Frontend_Pods["<b>Deployment: Frontend SPA</b><br/>[Nginx + React Static]<br/>Replicas: 2"]
-                API_Pods["<b>Deployment: Core Backend API</b><br/>[ASP.NET Core Container]<br/>HPA Replicas: 2..8"]
-                Worker_Pods["<b>Deployment: Notification & Report Worker</b><br/>[Worker Container]<br/>HPA Replicas: 1..4"]
-                Redis_Pod["<b>StatefulSet: Redis</b><br/>[Cache & Job Queue]"]
+                Frontend_Pods["Deployment: Frontend SPA - Nginx + React, Replicas: 2"]
+                API_Pods["Deployment: Core Backend API - ASP.NET Core, HPA: 2..8"]
+                Worker_Pods["Deployment: Notification Worker - HPA: 1..4"]
+                Redis_Pod["StatefulSet: Redis - Cache and Queue"]
             end
 
             subgraph Monitoring_Namespace ["Namespace: observability"]
-                Prom_Grafana["<b>Prometheus + Grafana + Loki</b><br/>[Збір метрик, логів та алертинг]"]
+                Prom_Grafana["Prometheus + Grafana + Loki"]
             end
         end
 
         subgraph Managed_Services ["Сховища даних та медіа"]
-            PG_Cluster[("<b>PostgreSQL Cluster</b><br/>[Primary + Standby Replica]<br/>Multi-AZ / Backup")]
-            S3_Bucket[("<b>Object Storage (S3 / MinIO)</b><br/>[Бакет фото поломок і звітів]")]
+            PG_Cluster[("PostgreSQL Cluster - Primary + Replica")]
+            S3_Bucket[("Object Storage S3 / MinIO - Фото та звіти")]
         end
     end
 
-    Browser -->|"HTTPS (443)"| LB
-    Browser -->|"HTTPS (Pre-signed URL)"| S3_Bucket
-    LB -->|"HTTP (80)"| Frontend_Pods
-    LB -->|"HTTP (8080) /api/*"| API_Pods
+    Browser -->|"HTTPS 443"| LB
+    Browser -->|"HTTPS Pre-signed URL"| S3_Bucket
+    LB -->|"HTTP 80"| Frontend_Pods
+    LB -->|"HTTP 8080 /api/*"| API_Pods
 
-    API_Pods -->|"TCP (5432)"| PG_Cluster
-    API_Pods -->|"TCP (6379)"| Redis_Pod
-    API_Pods -->|"HTTPS (S3 API)"| S3_Bucket
+    API_Pods -->|"TCP 5432"| PG_Cluster
+    API_Pods -->|"TCP 6379"| Redis_Pod
+    API_Pods -->|"HTTPS S3 API"| S3_Bucket
 
-    Worker_Pods -->|"TCP (6379)"| Redis_Pod
-    Worker_Pods -->|"TCP (5432)"| PG_Cluster
-    Worker_Pods -->|"HTTPS (S3 API)"| S3_Bucket
+    Worker_Pods -->|"TCP 6379"| Redis_Pod
+    Worker_Pods -->|"TCP 5432"| PG_Cluster
+    Worker_Pods -->|"HTTPS S3 API"| S3_Bucket
 
-    Prom_Grafana -.->|"Scrape /metrics & logs"| API_Pods
-    Prom_Grafana -.->|"Scrape /metrics & logs"| Worker_Pods
+    Prom_Grafana -.->|"Scrape metrics and logs"| API_Pods
+    Prom_Grafana -.->|"Scrape metrics and logs"| Worker_Pods
 
     classDef k8s fill:#326ce5,stroke:#1e40af,color:#ffffff
     classDef storage fill:#0f766e,stroke:#115e59,color:#ffffff
@@ -194,4 +193,5 @@ flowchart TB
     class Frontend_Pods,API_Pods,Worker_Pods,Redis_Pod k8s
     class PG_Cluster,S3_Bucket storage
     class Prom_Grafana obs
-```
+
+
