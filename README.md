@@ -204,18 +204,17 @@ flowchart TB
 1. [ADR-0001: Гібридна архітектура зберігання даних (PostgreSQL + S3 Object Storage)](docs/adr/adr_0001.md)
 2. [ADR-0002: Вибір технологічного стеку та асинхронної обробки задач у Kubernetes](docs/adr/adr_0002.md)
 
+---
 
 # Лабораторна робота №2: Контейнеризація та локальне середовище
 
 ## DormHelper — Інформаційна система обліку та обробки заявок на технічне обслуговування і ремонт у студентському гуртожитку
 
-Мета роботи — перенести архітектуру контейнерів (C4 Container View з Лабораторної роботи №1) у відтворюване локальне середовище за допомогою **Docker** та **Docker Compose** із дотриманням принципів **12-Factor App**, багатоетапної збірки (**Multi-stage builds**), запуску від імені **non-root** користувачів, постійних томів (**Volumes**), перевірок готовності (**Healthchecks**) та ізоляції мереж (**Networks**).
-
 ---
 
 ## 1. Підготовка кодової бази та дотримання 12-Factor App
 
-### Відповідність сервісів діаграмі C4 Container (ЛР №1)
+### Відповідність сервісів діаграмі C4 Container
 У локальному середовищі розгортаються ключові контейнери архітектури **DormHelper**:
 - **Frontend SPA (`frontend`)** — веб-інтерфейс для студентів, майстрів, коменданта та адміністратора (React/TypeScript збірка, віддається через Nginx).
 - **Core Backend API (`backend`)** — сервіс бізнес-логіки заявок, ролей (RBAC), історії статусів та публікації подій (`ASP.NET Core / C#`).
@@ -255,28 +254,3 @@ flowchart TB
 ### Перевірки стану та порядок запуску (`Healthchecks` + `depends_on`)
 - Для `db`, `cache`, `minio` та `backend` налаштовано секції `healthcheck`.
 - Залежні сервіси використовують `depends_on` з умовою `condition: service_healthy`, щоб `backend` стартував лише після готовності `db`, `cache` і `minio`, а `frontend` — після проходження healthcheck у `backend`.
-
-### Діаграма мереж та сервісів локального середовища
-
-```mermaid
-flowchart LR
-    subgraph Host["Хост-машина (Браузер / Клієнт)"]
-        Browser["Користувач :8080"]
-    end
-
-    subgraph FrontendNet["Мережа: frontend-net"]
-        FE["frontend (:8080, non-root)"]
-        BE["backend (:8080, non-root)"]
-    end
-
-    subgraph BackendNet["Мережа: backend-net (ізольована)"]
-        DB[("db: PostgreSQL\nVolume: pg_data")]
-        Cache[("cache: Redis\nVolume: redis_data")]
-        MinIO[("minio: S3 Storage\nVolume: minio_data")]
-    end
-
-    Browser -->|"HTTP :8080"| FE
-    FE -->|"HTTP /api"| BE
-    BE -->|"TCP :5432"| DB
-    BE -->|"TCP :6379"| Cache
-    BE -->|"HTTP :9000"| MinIO
