@@ -1,0 +1,122 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: dormhelper-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-dormhelper_dev}
+      POSTGRES_USER: ${POSTGRES_USER:-dormhelper_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_db_password}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks:
+      - backend-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dormhelper_user} -d ${POSTGRES_DB:-dormhelper_dev}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  cache:
+    image: redis:7-alpine
+    container_name: dormhelper-cache
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    networks:
+      - backend-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    container_name: dormhelper-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-dormhelper_minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-changeme_minio_password}
+    volumes:
+      - minio_data:/data
+    networks:
+      - backend-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dormhelper-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=${POSTGRES_DB:-dormhelper_dev};Username=${POSTGRES_USER:-dormhelper_user};Password=${POSTGRES_PASSWORD:-changeme_db_password}"
+      ConnectionStrings__Redis: "cache:6379"
+      Storage__Endpoint: "http://minio:9000"
+      Storage__Bucket: ${MINIO_BUCKET:-dormhelper-photos}
+      Storage__AccessKey: ${MINIO_ROOT_USER:-dormhelper_minio}
+      Storage__SecretKey: ${MINIO_ROOT_PASSWORD:-changeme_minio_password}
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:-dev_only_replace_in_production_key_123456}
+    expose:
+      - "8080"
+    networks:
+      - frontend-net
+      - backend-net
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: dormhelper-web
+    ports:
+      - "${FRONTEND_PORT:-8080}:8080"
+    environment:
+      BACKEND_UPSTREAM: "http://backend:8080"
+    networks:
+      - frontend-net
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  pg_data:
+  redis_data:
+  minio_data:
+
+networks:
+  frontend-net:
+    driver: bridge
+  backend-net:
+    driver: bridge
+    internal: true
