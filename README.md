@@ -143,11 +143,11 @@ flowchart TB
 ### 4.3. Модель 4+1: Фізичний вигляд / Вигляд розгортання (Deployment View)
 Показує, як програмні контейнери DormHelper мапляться на інфраструктуру та кластер Kubernetes з урахуванням масштабованості, безпеки та observability.
 
-flowchart TB
+```meramid
+      flowchart TB
     subgraph Client_Node ["Клієнтське середовище"]
         Browser["Браузер або мобільний пристрій"]
     end
-
     subgraph Cloud_Infra ["Хмарна інфраструктура"]
         LB["Reverse Proxy / Ingress - TLS, Rate Limiting"]
 
@@ -193,5 +193,5 @@ flowchart TB
     class Frontend_Pods,API_Pods,Worker_Pods,Redis_Pod k8s
     class PG_Cluster,S3_Bucket storage
     class Prom_Grafana obs
-
+```
 
