@@ -1,1 +1,10 @@
-
+node_modules
+dist
+build
+coverage
+.git
+.github
+.env*
+*.log
+npm-debug.log*
+.DS_Store
