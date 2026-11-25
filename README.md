@@ -203,3 +203,80 @@ flowchart TB
 Усі архітектурні рішення зберігаються у каталозі docs/adr/:
 1. [ADR-0001: Гібридна архітектура зберігання даних (PostgreSQL + S3 Object Storage)](docs/adr/adr_0001.md)
 2. [ADR-0002: Вибір технологічного стеку та асинхронної обробки задач у Kubernetes](docs/adr/adr_0002.md)
+
+
+# Лабораторна робота №2: Контейнеризація та локальне середовище
+
+## DormHelper — Інформаційна система обліку та обробки заявок на технічне обслуговування і ремонт у студентському гуртожитку
+
+Мета роботи — перенести архітектуру контейнерів (C4 Container View з Лабораторної роботи №1) у відтворюване локальне середовище за допомогою **Docker** та **Docker Compose** із дотриманням принципів **12-Factor App**, багатоетапної збірки (**Multi-stage builds**), запуску від імені **non-root** користувачів, постійних томів (**Volumes**), перевірок готовності (**Healthchecks**) та ізоляції мереж (**Networks**).
+
+---
+
+## 1. Підготовка кодової бази та дотримання 12-Factor App
+
+### Відповідність сервісів діаграмі C4 Container (ЛР №1)
+У локальному середовищі розгортаються ключові контейнери архітектури **DormHelper**:
+- **Frontend SPA (`frontend`)** — веб-інтерфейс для студентів, майстрів, коменданта та адміністратора (React/TypeScript збірка, віддається через Nginx).
+- **Core Backend API (`backend`)** — сервіс бізнес-логіки заявок, ролей (RBAC), історії статусів та публікації подій (`ASP.NET Core / C#`).
+- **PostgreSQL (`db`)** — реляційна база даних заявок, користувачів, локацій гуртожитку та записів Outbox.
+- **Redis (`cache`)** — кеш довідників, rate limiting та черга фонових задач.
+- **MinIO (`minio`)** — локальне S3-сумісне об'єктне сховище для фотографій поломок і фотозвітів.
+
+### Дотримання принципів 12-Factor App
+- **Фактор III (Конфігурація / Config):** порти, імена баз даних, користувачі, паролі та ключі підписання не зашиті жорстко в коді й передаються через змінні оточення (`environment` / `.env`, шаблон у [.env.example](.env.example)).
+- **Фактор VI (Процеси / Processes):** контейнери `frontend` та `backend` працюють як безстанові (stateless) процеси; усі дані стану зберігаються у `PostgreSQL`, `Redis`, `MinIO` або у винесених Docker `volumes`.
+- **Фактор IX (Утилізованість / Disposability):** сервіси мають налаштовані `healthcheck` та запускаються з коректною обробкою завершення процесів (`SIGTERM`).
+
+---
+
+## 2. Dockerfile, Multi-stage builds, .dockerignore та Non-Root користувачі
+
+Для кожного власного сервісу підготовлено багатоетапний `Dockerfile` (`builder` -> `runtime`) та файл виключень `.dockerignore`:
+
+- **Frontend:** [frontend/Dockerfile](frontend/Dockerfile) та [frontend/.dockerignore](frontend/.dockerignore). На першому етапі (`node:22-alpine`) збирається статика застосунку, на другому (`nginxinc/nginx-unprivileged:1.27-alpine`) копіюється лише готовий бандл `dist`, а процес працює від непривілейованого користувача `nginx` (`UID 101`) на порту `8080`.
+- **Backend:** [backend/Dockerfile](backend/Dockerfile) та [backend/.dockerignore](backend/.dockerignore). На етапі збірки (`mcr.microsoft.com/dotnet/sdk:8.0-alpine`) виконується `dotnet restore` і `dotnet publish`, а у фінальний образ (`mcr.microsoft.com/dotnet/aspnet:8.0-alpine`) переноситься лише скомпільований застосунок із запуском від користувача `appuser` (`UID 10001`).
+
+---
+
+## 3. Оркестрація локального середовища (Docker Compose)
+
+Конфігурація описана у файлі [docker-compose.yml](docker-compose.yml).
+
+### Мережева ізоляція (`Networks`)
+- **`frontend-net`:** з'єднує `frontend` та `backend` (щоб фронтенд міг проксіювати/звертатися до API).
+- **`backend-net`:** внутрішня мережа для `backend`, `db`, `cache` та `minio`. База даних `db` підключена **лише** до `backend-net` — вона недоступна з `frontend-net` і не прокидає порт назовні (`ports` не задано).
+
+### Постійні сховища (`Volumes`)
+- `pg_data` — зберігає дані `PostgreSQL` між перезапусками та перестворенням контейнерів.
+- `redis_data` — зберігає дані кешу/черги `Redis`.
+- `minio_data` — зберігає завантажені фотографії заявок і звітів у `MinIO`.
+
+### Перевірки стану та порядок запуску (`Healthchecks` + `depends_on`)
+- Для `db`, `cache`, `minio` та `backend` налаштовано секції `healthcheck`.
+- Залежні сервіси використовують `depends_on` з умовою `condition: service_healthy`, щоб `backend` стартував лише після готовності `db`, `cache` і `minio`, а `frontend` — після проходження healthcheck у `backend`.
+
+### Діаграма мереж та сервісів локального середовища
+
+```mermaid
+flowchart LR
+    subgraph Host["Хост-машина (Браузер / Клієнт)"]
+        Browser["Користувач :8080"]
+    end
+
+    subgraph FrontendNet["Мережа: frontend-net"]
+        FE["frontend (:8080, non-root)"]
+        BE["backend (:8080, non-root)"]
+    end
+
+    subgraph BackendNet["Мережа: backend-net (ізольована)"]
+        DB[("db: PostgreSQL\nVolume: pg_data")]
+        Cache[("cache: Redis\nVolume: redis_data")]
+        MinIO[("minio: S3 Storage\nVolume: minio_data")]
+    end
+
+    Browser -->|"HTTP :8080"| FE
+    FE -->|"HTTP /api"| BE
+    BE -->|"TCP :5432"| DB
+    BE -->|"TCP :6379"| Cache
+    BE -->|"HTTP :9000"| MinIO
