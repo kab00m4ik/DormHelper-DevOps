@@ -254,3 +254,9 @@ flowchart TB
 ### Перевірки стану та порядок запуску (`Healthchecks` + `depends_on`)
 - Для `db`, `cache`, `minio` та `backend` налаштовано секції `healthcheck`.
 - Залежні сервіси використовують `depends_on` з умовою `condition: service_healthy`, щоб `backend` стартував лише після готовності `db`, `cache` і `minio`, а `frontend` — після проходження healthcheck у `backend`.
+
+---
+
+## 4. Оновлення архітектурної документації (ADR)
+
+Додано запис [ADR-0003: Вибір Alpine-образів, non-root користувачів та ізольованих мереж у Docker Compose](docs/adr/adr_0003.md).
