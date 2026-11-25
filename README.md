@@ -144,10 +144,11 @@ flowchart TB
 Показує, як програмні контейнери DormHelper мапляться на інфраструктуру та кластер Kubernetes з урахуванням масштабованості, безпеки та observability.
 
 ```meramid
-      flowchart TB
+flowchart TB
     subgraph Client_Node ["Клієнтське середовище"]
         Browser["Браузер або мобільний пристрій"]
     end
+
     subgraph Cloud_Infra ["Хмарна інфраструктура"]
         LB["Reverse Proxy / Ingress - TLS, Rate Limiting"]
 
