@@ -1,7 +1,5 @@
 # Лабораторна робота №1: Аналіз, вимоги, життєвий цикл та архітектурне бачення
 
----
-
 # DormHelper — Інформаційна система обліку та обробки заявок на технічне обслуговування і ремонт у студентському гуртожитку
 
 ---
@@ -36,7 +34,7 @@
 | **Масштабованість (Scalability)** | Підтримка пікових сплесків звернень (заселення на початку семестру, опалювальний сезон, масові аварії водопостачання/електрики) — до 500–1 500 одночасних активних сесій і сплесків до 100+ заявок/хв без деградації API (`p95 < 300 мс` для читання/створення заявок). | Контейнеризація сервісів (Docker), горизонтальне масштабування stateless API та worker-нод за метриками CPU/RPS/черги (Kubernetes HPA або автоскейлінг хмарної платформи), винесення медіафайлів в об'єктне сховище (S3/MinIO) замість локального диска контейнера. |
 | **Доступність (Availability)** | Цільовий SLA `99.5%`–`99.9%` у робочий час і під час аварійних подій; планові оновлення без зупинки обслуговування (zero-downtime deployments). | Rolling update / Blue-Green стратегії розгортання в CI/CD, health/readiness probes (`/health/live`, `/health/ready`), реплікація БД (Primary + Read Replica або керований кластер БД з автоматичним failover) та щоденні автоматичні бекапи з перевіркою відновлення. |
 | **Безпека (Security)** | Захист персональних даних мешканців (ПІБ, кімната, контакти), розмежування доступу (RBAC: `Student`, `Technician`, `Commandant`, `Admin`), шифрування трафіку (`TLS 1.2/1.3`) і паролів/токенів, захист від OWASP Top 10 (SQLi, XSS, IDOR, брутфорс). | Секрети та ключі підписання токенів зберігаються у Secret Manager / CI/CD masked variables (не в Git), автоматичне SAST/SCA/container image сканування у CI pipeline (наприклад, Trivy / Semgrep), rate limiting на reverse proxy/API gateway, перевірка прав власності на рівні сервісів (захист від IDOR). |
-| **Обсервабіліті (Observability)** | Повна прозорість стану системи: метрики продуктивності й черг, структуровані логи з `correlationId`/`traceId`, алертинг при помилках `5xx`, затримках обробки заявок або збоях розсилки сповіщень. | З першого комміту впроваджується структуроване логування (JSON з `traceId`), експорт метрик у форматі Prometheus (`/metrics`), збір трейсів (OpenTelemetry), дашборди в Grafana та правила сповіщень (Alertmanager/Telegram/Email) для чергової команди. |
+| **Спостережливість (Observability)** | Повна прозорість стану системи: метрики продуктивності й черг, структуровані логи з `correlationId`/`traceId`, алертинг при помилках `5xx`, затримках обробки заявок або збоях розсилки сповіщень. | З першого комміту впроваджується структуроване логування (JSON з `traceId`), експорт метрик у форматі Prometheus (`/metrics`), збір трейсів (OpenTelemetry), дашборди в Grafana та правила сповіщень (Alertmanager/Telegram/Email) для чергової команди. |
 | **Зручність супроводу та відтворюваність (Maintainability & IaC)** | Ідентичність середовищ `dev`, `staging`, `prod`; швидкий розворот і відкат релізу (MTTR відновлення після невдалого деплою `< 10 хв`). | Уся інфраструктура та конфігурації описуються як код (IaC / Docker Compose / Helm / Terraform), автоматизовані міграції БД у релізному пайплайні з можливістю відкату, обов'язкові unit/integration тести та smoke-перевірки перед перемиканням трафіку. |
 
 ---
@@ -65,7 +63,7 @@
 
 ## 4. Архітектурне проєктування (C4 та модель 4+1)
 
-### C4 Рівень 1: System Context
+### 4.1 C4 Рівень 1: System Context
 Діаграма показує систему **DormHelper** у центрі, її користувачів (студентів, майстрів, коменданта/адміністрацію, системного адміністратора) та зовнішні сервіси (провайдер автентифікації/SSO або поштовий/месенджер-шлюз сповіщень, об'єктне сховище фото).
 
 ```mermaid
@@ -91,3 +89,109 @@ flowchart TB
     DormHelper -->|"OIDC / OAuth2 / SMTP<br/>Автентифікація та поштові сповіщення"| AuthProvider
     DormHelper -->|"HTTPS / Bot API / Push API<br/>Надсилає сповіщення користувачам"| NotifyGateway
     DormHelper -->|"HTTPS (S3 API / Presigned URLs)<br/>Зберігає та віддає фотографії"| ObjectStorage
+```
+
+---
+
+### 4.2 C4 Рівень 2: Container
+Діаграма розкриває внутрішню структуру DormHelper на рівні виконуваних контейнерів (веб-клієнт, API/модульний моноліт, фоновий воркер сповіщень та звітів, реляційна БД, кеш/брокер подій) і їхню взаємодію.
+
+```mermaid
+flowchart TB
+    User(["<b>Студент / Майстер / Комендант</b><br/>[Person]"])
+
+    subgraph DormHelper_Boundary ["Межі системи DormHelper"]
+        SPA["<b>Single-Page Application</b><br/>[Container: React / TypeScript]<br/>Інтерфейс подання заявок, реєстру звернень, кабінету майстра та аналітики"]
+        API["<b>Core Backend API</b><br/>[Container: ASP.NET Core / C#]<br/>Обробляє бізнес-логіку заявок, ролі (RBAC), валідацію, історію статусів та Outbox"]
+        Worker["<b>Notification & Report Worker</b><br/>[Container: Background Worker]<br/>Асинхронно обробляє події зміни статусів, надсилає сповіщення та формує звіти"]
+
+        DB[("<b>Relational Database</b><br/>[Container: PostgreSQL]<br/>Зберігає заявки, історію змін, користувачів, кімнати/корпуси та outbox-події")]
+        Cache[("<b>In-Memory Cache & Queue</b><br/>[Container: Redis]<br/>Кешує довідники приміщень/категорій, лімітує запити та тримає чергу задач")]
+        S3[("<b>Object Storage</b><br/>[Container: MinIO / S3]<br/>Зберігає фотографії поломок та фотозвіти виконаних робіт")]
+    end
+
+    UniSSO["<b>Університетський SSO / Auth</b><br/>[External System]"]
+    NotifySys["<b>Telegram API / SMTP</b><br/>[External System]"]
+
+    %% Взаємодія
+    User -->|"Відкриває портал та керує заявками (HTTPS)"| SPA
+    SPA -->|"Викликає REST API (JSON / HTTPS)"| API
+    SPA -->|"Завантажує та переглядає фото за Pre-signed URLs (HTTPS)"| S3
+
+    API -->|"Читає та записує дані заявок і Outbox (TCP / SQL)"| DB
+    API -->|"Кешує довідники та ставить задачі в чергу (TCP)"| Cache
+    API -->|"Генерує Pre-signed URLs для фото (S3 API)"| S3
+    API -->|"Перевіряє токени авторизації (HTTPS)"| UniSSO
+
+    Worker -->|"Бере задачі на відправку сповіщень та звіти (TCP)"| Cache
+    Worker -->|"Читає дані заявок та оновлює статус доставки (TCP / SQL)"| DB
+    Worker -->|"Надсилає сповіщення користувачам (HTTPS / SMTP)"| NotifySys
+
+    classDef person fill:#08427b,stroke:#052e56,color:#ffffff
+    classDef container fill:#438dd5,stroke:#2e6295,color:#ffffff
+    classDef db fill:#2b6cb0,stroke:#1a365d,color:#ffffff
+    classDef external fill:#999999,stroke:#6b6b6b,color:#ffffff
+
+    class User person
+    class SPA,API,Worker container
+    class DB,Cache,S3 db
+    class UniSSO,NotifySys external
+```
+
+---
+
+### 4.3. Модель 4+1: Фізичний вигляд / Вигляд розгортання (Deployment View)
+Показує, як програмні контейнери DormHelper мапляться на інфраструктуру та кластер Kubernetes з урахуванням масштабованості, безпеки та observability.
+
+```meramid
+flowchart TB
+    subgraph Client_Node ["Клієнтське середовище"]
+        Browser["Браузер або мобільний пристрій користувача"]
+    end
+
+    subgraph Cloud_Infra ["Хмарна / Серверна інфраструктура"]
+        LB["<b>Reverse Proxy / Ingress Controller</b><br/>[TLS Termination, Rate Limiting]"]
+
+        subgraph K8s_Cluster ["Kubernetes Cluster (Production)"]
+            subgraph App_Namespace ["Namespace: dormhelper-prod"]
+                Frontend_Pods["<b>Deployment: Frontend SPA</b><br/>[Nginx + React Static]<br/>Replicas: 2"]
+                API_Pods["<b>Deployment: Core Backend API</b><br/>[ASP.NET Core Container]<br/>HPA Replicas: 2..8"]
+                Worker_Pods["<b>Deployment: Notification & Report Worker</b><br/>[Worker Container]<br/>HPA Replicas: 1..4"]
+                Redis_Pod["<b>StatefulSet: Redis</b><br/>[Cache & Job Queue]"]
+            end
+
+            subgraph Monitoring_Namespace ["Namespace: observability"]
+                Prom_Grafana["<b>Prometheus + Grafana + Loki</b><br/>[Збір метрик, логів та алертинг]"]
+            end
+        end
+
+        subgraph Managed_Services ["Сховища даних та медіа"]
+            PG_Cluster[("<b>PostgreSQL Cluster</b><br/>[Primary + Standby Replica]<br/>Multi-AZ / Backup")]
+            S3_Bucket[("<b>Object Storage (S3 / MinIO)</b><br/>[Бакет фото поломок і звітів]")]
+        end
+    end
+
+    Browser -->|"HTTPS (443)"| LB
+    Browser -->|"HTTPS (Pre-signed URL)"| S3_Bucket
+    LB -->|"HTTP (80)"| Frontend_Pods
+    LB -->|"HTTP (8080) /api/*"| API_Pods
+
+    API_Pods -->|"TCP (5432)"| PG_Cluster
+    API_Pods -->|"TCP (6379)"| Redis_Pod
+    API_Pods -->|"HTTPS (S3 API)"| S3_Bucket
+
+    Worker_Pods -->|"TCP (6379)"| Redis_Pod
+    Worker_Pods -->|"TCP (5432)"| PG_Cluster
+    Worker_Pods -->|"HTTPS (S3 API)"| S3_Bucket
+
+    Prom_Grafana -.->|"Scrape /metrics & logs"| API_Pods
+    Prom_Grafana -.->|"Scrape /metrics & logs"| Worker_Pods
+
+    classDef k8s fill:#326ce5,stroke:#1e40af,color:#ffffff
+    classDef storage fill:#0f766e,stroke:#115e59,color:#ffffff
+    classDef obs fill:#7c3aed,stroke:#5b21b6,color:#ffffff
+
+    class Frontend_Pods,API_Pods,Worker_Pods,Redis_Pod k8s
+    class PG_Cluster,S3_Bucket storage
+    class Prom_Grafana obs
+```
