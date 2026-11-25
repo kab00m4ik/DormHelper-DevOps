@@ -1,1 +1,11 @@
-
+bin/
+obj/
+out/
+.git/
+.github/
+.vs/
+.vscode/
+*.user
+*.log
+.env*
+tests/
