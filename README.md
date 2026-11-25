@@ -196,3 +196,10 @@ flowchart TB
     class Prom_Grafana obs
 ```
 
+---
+
+## 5. Журнал архітектурних рішень (Architecture Decision Records)
+
+Усі архітектурні рішення зберігаються у каталозі docs/adr/:
+1. [ADR-0001: Гібридна архітектура зберігання даних (PostgreSQL + S3 Object Storage)](docs/adr/adr_0001.md)
+2. [ADR-0002: Вибір технологічного стеку та асинхронної обробки файлів у Kubernetes](docs/adr/adr_0002.md)
