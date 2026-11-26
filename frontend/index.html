@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DormHelper — Заявки на ремонт і ТО у гуртожитку</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #1e293b;
+      --panel-2: #162032;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --border: #334155;
+      --accent: #38bdf8;
+      --accent-text: #082f49;
+      --ok: #22c55e;
+      --warn: #f59e0b;
+      --crit: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.45;
+    }
+    header {
+      border-bottom: 1px solid var(--border);
+      background: var(--panel-2);
+      padding: 14px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header h1 { margin: 0; font-size: 1.15rem; }
+    header p { margin: 2px 0 0; color: var(--muted); font-size: 0.85rem; }
+    .role-bar { display: flex; gap: 6px; flex-wrap: wrap; }
+    .role-btn {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      padding: 6px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    .role-btn.active {
+      background: var(--accent);
+      color: var(--accent-text);
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+    main {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 18px 20px 40px;
+      display: grid;
+      gap: 18px;
+    }
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+    }
+    .kpi {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+    }
+    .kpi .num { font-size: 1.4rem; font-weight: 700; }
+    .kpi .lbl { color: var(--muted); font-size: 0.8rem; }
+    .grid {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 18px;
+      align-items: start;
+    }
+    @media (max-width: 860px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .card h2 { margin: 0 0 12px; font-size: 1rem; }
+    label { display: block; font-size: 0.82rem; color: var(--muted); margin-top: 10px; }
+    input, select, textarea {
+      width: 100%;
+      margin-top: 4px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      color: var(--text);
+      font-size: 0.9rem;
+    }
+    textarea { min-height: 72px; resize: vertical; }
+    .btn {
+      margin-top: 14px;
+      width: 100%;
+      padding: 10px 14px;
+      border: 0;
+      border-radius: 8px;
+      background: var(--accent);
+      color: var(--accent-text);
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .filters select, .filters input {
+      width: auto;
+      min-width: 150px;
+      margin-top: 0;
+      padding: 6px 10px;
+      font-size: 0.85rem;
+    }
+    .ticket {
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 10px;
+    }
+    .ticket-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      border: 1px solid var(--border);
+    }
+    .p-high { border-color: var(--crit); color: #fca5a5; }
+    .p-med { border-color: var(--warn); color: #fcd34d; }
+    .p-low { border-color: var(--ok); color: #86efac; }
+    .meta { color: var(--muted); font-size: 0.8rem; margin-top: 6px; }
+    .photo-preview {
+      margin-top: 8px;
+      max-height: 150px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      display: block;
+    }
+    .actions {
+      margin-top: 10px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .actions select { width: auto; margin-top: 0; padding: 4px 8px; font-size: 0.8rem; }
+    .small-btn {
+      padding: 5px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+    .empty { color: var(--muted); font-size: 0.9rem; padding: 12px 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>DormHelper — ТО та ремонт у гуртожитку</h1>
+      <p>Заявки мешканців, пріоритизація, фотофіксація, трекінг статусів і звітність</p>
+    </div>
+    <div class="role-bar" id="roleBar">
+      <button class="role-btn active" data-role="student">Студент</button>
+      <button class="role-btn" data-role="tech">Майстер</button>
+      <button class="role-btn" data-role="admin">Комендант</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="kpis" id="kpis"></section>
+
+    <div class="grid">
+      <section class="card">
+        <h2>Нова заявка на ремонт / ТО</h2>
+        <form id="ticketForm">
+          <label>Кімната / локація
+            <input type="text" id="room" placeholder="Напр., Кімната 412 або Кухня 4 поверх" required />
+          </label>
+          <label>Категорія несправності
+            <select id="category">
+              <option value="Сантехніка">Сантехніка</option>
+              <option value="Електрика">Електрика</option>
+              <option value="Опалення / вентиляція">Опалення / вентиляція</option>
+              <option value="Меблі / двері / вікна">Меблі / двері / вікна</option>
+              <option value="Інше ТО">Інше ТО</option>
+            </select>
+          </label>
+          <label>Пріоритет
+            <select id="priority">
+              <option value="low">Низький</option>
+              <option value="med" selected>Середній</option>
+              <option value="high">Критичний</option>
+            </select>
+          </label>
+          <label>Опис проблеми
+            <textarea id="desc" placeholder="Що саме зламалося і коли виникла проблема..." required></textarea>
+          </label>
+          <label>Фотофіксація (опціонально)
+            <input type="file" id="photo" accept="image/*" />
+          </label>
+          <button class="btn" type="submit">Створити заявку</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>Журнал заявок та звітність</h2>
+        <div class="filters">
+          <select id="filterStatus">
+            <option value="all">Усі статуси</option>
+            <option value="Нова">Нова</option>
+            <option value="В роботі">В роботі</option>
+            <option value="Очікує запчастини">Очікує запчастини</option>
+            <option value="Виконано">Виконано</option>
+          </select>
+          <select id="filterPriority">
+            <option value="all">Усі пріоритети</option>
+            <option value="high">Критичний</option>
+            <option value="med">Середній</option>
+            <option value="low">Низький</option>
+          </select>
+          <input type="text" id="searchText" placeholder="Пошук за кімнатою або описом..." />
+          <button class="small-btn" id="exportCsv" type="button">Експорт CSV</button>
+        </div>
+        <div id="ticketList"></div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const STORAGE_KEY = "dormhelper_tickets_v1";
+    const STATUSES = ["Нова", "В роботі", "Очікує запчастини", "Виконано"];
+    const PRIO_LABEL = { high: "Критичний", med: "Середній", low: "Низький" };
+
+    let currentRole = "student";
+    let tickets = loadTickets();
+
+    function loadTickets() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) return JSON.parse(raw);
+      } catch (_) {}
+      return [
+        {
+          id: "DH-101",
+          room: "Кімната 308",
+          category: "Сантехніка",
+          priority: "high",
+          desc: "Протікає змішувач під раковиною, вода збирається на підлозі.",
+          status: "В роботі",
+          assignee: "Олег (сантехнік)",
+          photoUrl: "",
+          createdAt: new Date().toISOString().slice(0, 16).replace("T", " ")
+        }
+      ];
+    }
+
+    function saveTickets() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(tickets));
+      } catch (_) {}
+    }
+
+    function fileToDataUrl(file) {
+      return new Promise((resolve) => {
+        if (!file) return resolve("");
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => resolve("");
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function renderKpis() {
+      const total = tickets.length;
+      const open = tickets.filter((t) => t.status !== "Виконано").length;
+      const crit = tickets.filter((t) => t.priority === "high" && t.status !== "Виконано").length;
+      const done = tickets.filter((t) => t.status === "Виконано").length;
+      document.getElementById("kpis").innerHTML = `
+        <div class="kpi"><div class="num">${total}</div><div class="lbl">Усього заявок</div></div>
+        <div class="kpi"><div class="num">${open}</div><div class="lbl">Активних у роботі</div></div>
+        <div class="kpi"><div class="num">${crit}</div><div class="lbl">Критичних відкритих</div></div>
+        <div class="kpi"><div class="num">${done}</div><div class="lbl">Виконано</div></div>
+      `;
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/[&<>"']/g, (m) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[m]));
+    }
+
+    function renderList() {
+      const st = document.getElementById("filterStatus").value;
+      const pr = document.getElementById("filterPriority").value;
+      const q = document.getElementById("searchText").value.trim().toLowerCase();
+
+      const filtered = tickets.filter((t) => {
+        if (st !== "all" && t.status !== st) return false;
+        if (pr !== "all" && t.priority !== pr) return false;
+        if (q && !`${t.id} ${t.room} ${t.category} ${t.desc}`.toLowerCase().includes(q)) return false;
+        return true;
+      });
+
+      const listEl = document.getElementById("ticketList");
+      if (!filtered.length) {
+        listEl.innerHTML = `<div class="empty">Заявок за обраними умовами немає.</div>`;
+        return;
+      }
+
+      listEl.innerHTML = filtered.map((t) => {
+        const canManage = currentRole === "tech" || currentRole === "admin";
+        const statusOpts = STATUSES.map(
+          (s) => `<option value="${s}" ${t.status === s ? "selected" : ""}>${s}</option>`
+        ).join("");
+
+        return `
+          <article class="ticket" data-id="${escapeHtml(t.id)}">
+            <div class="ticket-top">
+              <strong>${escapeHtml(t.id)} · ${escapeHtml(t.room)} (${escapeHtml(t.category)})</strong>
+              <div>
+                <span class="badge p-${escapeHtml(t.priority)}">${PRIO_LABEL[t.priority] || t.priority}</span>
+                <span class="badge">${escapeHtml(t.status)}</span>
+              </div>
+            </div>
+            <div style="margin-top:8px">${escapeHtml(t.desc)}</div>
+            ${t.photoUrl ? `<img class="photo-preview" src="${t.photoUrl}" alt="Фото заявки" />` : ""}
+            <div class="meta">Створено: ${escapeHtml(t.createdAt)} · Виконавець: ${escapeHtml(t.assignee || "Не призначено")}</div>
+            ${canManage ? `
+              <div class="actions">
+                <select class="status-sel">${statusOpts}</select>
+                <input type="text" class="assignee-inp" value="${escapeHtml(t.assignee || "")}" placeholder="Призначити майстра" style="width:170px;margin-top:0;padding:4px 8px;font-size:0.8rem" />
+                <button class="small-btn save-btn" type="button">Оновити</button>
+                ${currentRole === "admin" ? `<button class="small-btn del-btn" type="button">Видалити</button>` : ""}
+              </div>
+            ` : ""}
+          </article>
+        `;
+      }).join("");
+    }
+
+    document.getElementById("roleBar").addEventListener("click", (e) => {
+      const btn = e.target.closest(".role-btn");
+      if (!btn) return;
+      currentRole = btn.dataset.role;
+      document.querySelectorAll(".role-btn").forEach((b) => b.classList.toggle("active", b === btn));
+      renderList();
+    });
+
+    document.getElementById("ticketForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const photoFile = document.getElementById("photo").files[0];
+      const photoUrl = await fileToDataUrl(photoFile);
+      const nextNum = 100 + tickets.length + 1;
+
+      const item = {
+        id: `DH-${nextNum}`,
+        room: document.getElementById("room").value.trim(),
+        category: document.getElementById("category").value,
+        priority: document.getElementById("priority").value,
+        desc: document.getElementById("desc").value.trim(),
+        status: "Нова",
+        assignee: "",
+        photoUrl,
+        createdAt: new Date().toISOString().slice(0, 16).replace("T", " ")
+      };
+
+      tickets.unshift(item);
+      saveTickets();
+      renderKpis();
+      renderList();
+      e.target.reset();
+    });
+
+    document.getElementById("ticketList").addEventListener("click", (e) => {
+      const card = e.target.closest(".ticket");
+      if (!card) return;
+      const id = card.dataset.id;
+      const idx = tickets.findIndex((t) => t.id === id);
+      if (idx === -1) return;
+
+      if (e.target.classList.contains("save-btn")) {
+        tickets[idx].status = card.querySelector(".status-sel").value;
+        tickets[idx].assignee = card.querySelector(".assignee-inp").value.trim();
+        saveTickets();
+        renderKpis();
+        renderList();
+      } else if (e.target.classList.contains("del-btn")) {
+        tickets.splice(idx, 1);
+        saveTickets();
+        renderKpis();
+        renderList();
+      }
+    });
+
+    ["filterStatus", "filterPriority", "searchText"].forEach((id) => {
+      document.getElementById(id).addEventListener("input", renderList);
+      document.getElementById(id).addEventListener("change", renderList);
+    });
+
+    document.getElementById("exportCsv").addEventListener("click", () => {
+      const rows = [["ID", "Кімната", "Категорія", "Пріоритет", "Статус", "Виконавець", "Дата", "Опис"]];
+      tickets.forEach((t) => rows.push([
+        t.id, t.room, t.category, PRIO_LABEL[t.priority] || t.priority,
+        t.status, t.assignee || "", t.createdAt, t.desc.replace(/\n/g, " ")
+      ]));
+      const csv = rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+      const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "dormhelper-report.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    renderKpis();
+    renderList();
+  </script>
+</body>
+</html>
